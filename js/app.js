@@ -1,6 +1,50 @@
 // --- State Management ---
 let appData = { images: [], currentId: null, view: 'welcome' };
 
+// --- Delete Functions ---
+function deleteImage(id) {
+    if (!confirm('確定要刪除這張圖片嗎？')) return;
+
+    const index = appData.images.findIndex(img => img.id === id);
+    if (index === -1) return;
+
+    // Release URL object to memory
+    URL.revokeObjectURL(appData.images[index].url);
+
+    appData.images.splice(index, 1);
+
+    if (appData.images.length === 0) {
+        appData.currentId = null;
+        switchView('welcome');
+    } else if (appData.currentId === id) {
+        // If deleted current, select previous or first
+        const newIndex = Math.max(0, index - 1);
+        appData.currentId = appData.images[newIndex].id;
+
+        if (appData.view === 'single') renderSingleView();
+        if (appData.view === 'compare') renderCompareView();
+    } else {
+        // If deleted non-current, just update compare view if active
+        if (appData.view === 'compare') renderCompareView();
+    }
+
+    updateGallery();
+    showToast('圖片已刪除');
+}
+
+function clearAllImages() {
+    if (appData.images.length === 0) return;
+    if (!confirm('確定要刪除所有圖片嗎？')) return;
+
+    appData.images.forEach(img => URL.revokeObjectURL(img.url));
+    appData.images = [];
+    appData.currentId = null;
+
+    updateGallery();
+    switchView('welcome');
+    showToast('已清空所有圖片');
+}
+
 // --- Global Events ---
 window.addEventListener('mousemove', (e) => {
     if (typeof handleLbMove === 'function') handleLbMove(e);

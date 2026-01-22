@@ -84,6 +84,8 @@ body {
     /* Prevent user selection */
     user-select: none;
     -webkit-user-select: none;
+    max-width: none !important;
+    max-height: none !important;
 }
 
 .lightbox-img:active {
