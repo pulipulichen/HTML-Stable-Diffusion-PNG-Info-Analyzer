@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable Diffusion 多圖分析與比較工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        .drag-active {
+            border-color: #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.1) !important;
+        }
+
+        /* Smooth fade in */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Thumbnail active state */
+        .thumb-active {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Sticky Column (First column) */
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background-color: #1e293b;
+            z-index: 30;
+            /* Higher than normal cells */
+        }
+
+        /* Sticky Header (First row) */
+        .sticky-header th {
+            position: sticky;
+            top: 0;
+            background-color: #1e293b;
+            z-index: 20;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Intersection of Sticky Col and Header needs highest Z-index */
+        .sticky-header th.sticky-col {
+            z-index: 40;
+        }
+
+        /* Lightbox Image */
+        .lightbox-img {
+            max-height: 90vh;
+            max-width: 90vw;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            cursor: grab;
+            /* REMOVED transition to fix drag lag */
+            transform-origin: center center;
+            will-change: transform;
+        }
+
+        .lightbox-img:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-200 h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Bar -->
+    <header
+        class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shrink-0 z-20 shadow-md">
+        <div class="flex items-center gap-3">
+            <h1 class="text-xl font-bold text-blue-400">
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i>SD Info Reader
+            </h1>
+            <span class="text-xs text-slate-500 hidden md:inline">v2.4 Fixes</span>
+        </div>
+
+        <div class="flex gap-2">
+            <button onclick="switchView('single')" id="btn-view-single"
+                class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition-colors">
+                <i class="fa-solid fa-image mr-2"></i>單圖分析
+            </button>
+            <button onclick="switchView('compare')" id="btn-view-compare"
+                class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 transition-colors">
+                <i class="fa-solid fa-table-columns mr-2"></i>差異比較
+            </button>
+            <button onclick="document.getElementById('file-input').click()"
+                class="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors ml-2">
+                <i class="fa-solid fa-plus mr-2"></i>新增圖片
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex flex-1 overflow-hidden relative" id="main-layout">
+
+        <!-- Drop Overlay (Hidden by default, shown on drag) -->
+        <div id="drop-overlay"
+            class="absolute inset-0 bg-slate-900/90 z-50 hidden flex flex-col items-center justify-center border-4 border-dashed border-blue-500 m-4 rounded-xl backdrop-blur-sm pointer-events-none">
+            <i class="fa-solid fa-cloud-arrow-up text-6xl text-blue-400 mb-4 animate-bounce"></i>
+            <h2 class="text-2xl font-bold text-white">放開滑鼠以上傳圖片</h2>
+        </div>
+
+        <!-- Sidebar (Gallery) -->
+        <aside class="w-24 md:w-32 lg:w-48 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0">
+            <div
+                class="p-3 border-b border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">
+                圖片列表 (<span id="img-count">0</span>)
+            </div>
+            <div id="gallery-list" class="flex-1 overflow-y-auto p-2 space-y-2">
+                <!-- Empty State -->
+                <div id="empty-gallery-msg" class="text-center text-slate-600 text-xs py-8 px-2">
+                    <i class="fa-regular fa-images text-2xl mb-2"></i>
+                    <p>暫無圖片</p>
+                </div>
+                <!-- Thumbnails will be injected here -->
+            </div>
+
+            <!-- Hidden Input -->
+            <input type="file" id="file-input" class="hidden" accept="image/png" multiple>
+        </aside>
+
+        <!-- Content Area -->
+        <main class="flex-1 overflow-hidden bg-slate-950 relative flex flex-col" id="content-area">
+
+            <!-- Welcome / Empty State (Scrollable) -->
+            <div id="welcome-screen"
+                class="absolute inset-0 overflow-y-auto p-4 md:p-8 flex flex-col items-center justify-center text-center max-w-lg mx-auto fade-in z-0">
+                <div class="bg-slate-900 p-8 rounded-2xl border-2 border-dashed border-slate-700 hover:border-blue-500 transition-colors cursor-pointer group w-full"
+                    onclick="document.getElementById('file-input').click()">
+                    <i
+                        class="fa-solid fa-cloud-arrow-up text-5xl text-slate-600 group-hover:text-blue-500 mb-6 transition-colors"></i>
+                    <h2 class="text-2xl font-bold text-white mb-2">開始分析</h2>
+                    <p class="text-slate-400 mb-6">點擊上傳或直接拖曳圖片到此處<br><span class="text-xs text-slate-500">支援多張 PNG
+                            批次上傳</span></p>
+
+                    <div class="relative" onclick="event.stopPropagation()">
+                        <div class="flex">
+                            <input type="text" id="url-input"
+                                class="w-full bg-slate-800 border border-slate-600 rounded-l-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
+                                placeholder="或輸入圖片網址...">
+                            <button onclick="handleUrlInput()"
+                                class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-r-lg text-sm font-medium transition-colors">分析</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Single View (Scrollable) -->
+            <div id="single-view" class="hidden absolute inset-0 overflow-y-auto p-4 md:p-8 fade-in z-10">
+                <div class="max-w-6xl mx-auto">
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                        <!-- Left: Image (4 cols) -->
+                        <div class="lg:col-span-4 space-y-4">
+                            <div class="bg-slate-900 rounded-xl p-2 border border-slate-800 shadow-lg sticky top-4">
+                                <div class="relative aspect-square bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMGYxNzJhIi8+CjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiMxZTI5M2IiLz4KPHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjQiIGhlaWdodD0iNCIgZmlsbD0iIzFlMjkzYiIvPgo8L3N2Zz4=')] rounded-lg overflow-hidden flex items-center justify-center cursor-zoom-in"
+                                    onclick="openLightbox(document.getElementById('main-preview').src)">
+                                    <img id="main-preview" class="max-w-full max-h-full object-contain" src="" alt="">
+                                </div>
+                                <div class="mt-3 px-2 pb-1">
+                                    <div class="text-xs font-bold text-slate-500 uppercase">檔案名稱</div>
+                                    <div id="main-filename" class="text-sm font-mono text-slate-300 break-all"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Info (8 cols) -->
+                        <div class="lg:col-span-8 space-y-6">
+
+                            <!-- Positive Prompt -->
+                            <div
+                                class="bg-slate-900 rounded-xl border-l-4 border-green-500 p-5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-green-500 font-bold text-xs uppercase tracking-wider mt-1">Prompt
+                                    </h3>
+                                    <button onclick="copyText('display-prompt')"
+                                        class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded transition-colors"
+                                        title="複製 Prompt">
+                                        <i class="fa-regular fa-copy"></i> 複製
+                                    </button>
+                                </div>
+                                <p id="display-prompt"
+                                    class="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-light"></p>
+                            </div>
+
+                            <!-- Negative Prompt -->
+                            <div
+                                class="bg-slate-900 rounded-xl border-l-4 border-red-500 p-5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="text-red-500 font-bold text-xs uppercase tracking-wider mt-1">Negative
+                                        Prompt</h3>
+                                    <button onclick="copyText('display-negative')"
+                                        class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded transition-colors"
+                                        title="複製 Negative Prompt">
+                                        <i class="fa-regular fa-copy"></i> 複製
+                                    </button>
+                                </div>
+                                <p id="display-negative"
+                                    class="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-light"></p>
+                            </div>
+
+                            <!-- Parameters Grid -->
+                            <div>
+                                <h3 class="text-slate-500 font-bold text-xs uppercase tracking-wider mb-3 px-1">生成參數
+                                    (點擊卡片複製)</h3>
+                                <div id="display-params" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                                    <!-- Cards injected here -->
+                                </div>
+                            </div>
+
+                            <!-- Raw Data -->
+                            <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+                                <div class="flex justify-between items-center p-3 bg-slate-800/50 cursor-pointer hover:bg-slate-800 transition-colors"
+                                    onclick="toggleRaw()">
+                                    <span class="text-xs font-bold text-slate-400">原始資料 (Raw Data)</span>
+                                    <div class="flex items-center gap-2">
+                                        <button onclick="event.stopPropagation(); copyText('display-raw')"
+                                            class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition-colors">
+                                            <i class="fa-regular fa-copy"></i> 複製全部
+                                        </button>
+                                        <i id="raw-arrow" class="fa-solid fa-chevron-down text-slate-500"></i>
+                                    </div>
+                                </div>
+                                <div id="raw-container" class="hidden p-4 bg-slate-950 border-t border-slate-800">
+                                    <pre id="display-raw"
+                                        class="text-xs font-mono text-green-400 whitespace-pre-wrap break-all max-h-64 overflow-y-auto"></pre>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compare View (Scrollable) -->
+            <div id="compare-view" class="hidden absolute inset-0 overflow-auto fade-in z-10 p-4 md:p-8">
+                <div class="min-w-max">
+                    <h2 class="text-xl font-bold text-slate-300 mb-4 px-2">參數差異比對 (僅顯示差異)</h2>
+                    <table class="w-full border-separate border-spacing-0 text-left text-sm">
+                        <thead id="compare-head" class="text-slate-400 sticky-header">
+                            <!-- Injected Headers -->
+                        </thead>
+                        <tbody id="compare-body" class="divide-y divide-slate-800 bg-slate-900/50">
+                            <!-- Injected Rows -->
+                        </tbody>
+                    </table>
+                    <p class="text-center text-slate-500 mt-8 text-sm italic hidden" id="compare-empty-msg">
+                        請至少上傳兩張圖片以進行比較。</p>
+                    <p class="text-center text-slate-500 mt-8 text-sm italic hidden" id="compare-no-diff-msg">
+                        兩張圖片的參數完全相同。</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox-modal"
+        class="fixed inset-0 bg-black/95 z-50 hidden flex items-center justify-center opacity-0 transition-opacity duration-300 overflow-hidden"
+        onwheel="handleLbWheel(event)">
+        <!-- Image Container for Transforms -->
+        <div class="relative w-full h-full flex items-center justify-center overflow-hidden" onclick="closeLightbox()">
+            <img id="lightbox-image" src="" class="lightbox-img rounded-lg shadow-2xl select-none"
+                onmousedown="handleLbDown(event)" onclick="event.stopPropagation()" ondragstart="return false">
+        </div>
+
+        <button
+            class="fixed top-5 right-5 text-white/70 hover:text-white text-4xl focus:outline-none z-50 bg-black/50 rounded-full w-12 h-12 flex items-center justify-center backdrop-blur-sm"
+            onclick="closeLightbox()">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div
+            class="fixed bottom-5 left-0 right-0 text-center text-slate-400 text-sm pointer-events-none z-50 bg-black/50 py-1 backdrop-blur-sm">
+            滾輪縮放 • 拖曳移動 • 點擊背景關閉
+        </div>
+
+        <!-- Background Click Overlay -->
+        <div class="absolute inset-0 z-0" onclick="closeLightbox()"></div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"
+        class="fixed bottom-8 left-1/2 transform -translate-x-1/2 translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-50 pointer-events-none">
+        <i class="fa-solid fa-circle-check text-green-500"></i>
+        <span id="toast-msg" class="font-medium">已複製</span>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let appData = {
+            images: [],
+            currentId: null,
+            view: 'welcome'
+        };
+
+        // --- Lightbox State ---
+        let lbState = {
+            scale: 1,
+            panning: false,
+            pointX: 0,
+            pointY: 0,
+            startX: 0,
+            startY: 0
+        };
+
+        // --- DOM Elements ---
+        const mainLayout = document.getElementById('main-layout');
+        const dropOverlay = document.getElementById('drop-overlay');
+        const galleryList = document.getElementById('gallery-list');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const singleView = document.getElementById('single-view');
+        const compareView = document.getElementById('compare-view');
+        const btnSingle = document.getElementById('btn-view-single');
+        const btnCompare = document.getElementById('btn-view-compare');
+        const fileInput = document.getElementById('file-input');
+        const urlInput = document.getElementById('url-input');
+        const imgCount = document.getElementById('img-count');
+
+        const lightboxModal = document.getElementById('lightbox-modal');
+        const lightboxImage = document.getElementById('lightbox-image');
+
+        // --- Global Event Listeners for Lightbox Dragging ---
+        window.addEventListener('mousemove', handleLbMove);
+        window.addEventListener('mouseup', handleLbUp);
+
+        // --- Drag & Drop ---
+        window.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.remove('hidden');
+            dropOverlay.classList.add('flex');
+        });
+
+        dropOverlay.addEventListener('dragleave', (e) => {
+            if (e.target === dropOverlay) {
+                dropOverlay.classList.add('hidden');
+                dropOverlay.classList.remove('flex');
+            }
+        });
+
+        window.addEventListener('dragover', (e) => e.preventDefault());
+
+        window.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropOverlay.classList.add('hidden');
+            dropOverlay.classList.remove('flex');
+            if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFiles(e.target.files);
+            fileInput.value = '';
+        });
+
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            const files = [];
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    files.push(items[i].getAsFile());
+                }
+            }
+            if (files.length > 0) handleFiles(files);
+        });
+
+        // --- Core Logic ---
+
+        async function handleFiles(fileList) {
+            let processedCount = 0;
+            const newImages = [];
+
+            for (let i = 0; i < fileList.length; i++) {
+                const file = fileList[i];
+                if (!file.type.startsWith('image/')) continue;
+
+                try {
+                    const url = URL.createObjectURL(file);
+                    const arrayBuffer = await readFileAsArrayBuffer(file);
+                    const info = parsePNGData(arrayBuffer);
+
+                    const imageObj = {
+                        id: Date.now() + Math.random().toString(36).substr(2, 9),
+                        file: file,
+                        name: file.name,
+                        url: url,
+                        info: info
+                    };
+
+                    appData.images.push(imageObj);
+                    newImages.push(imageObj);
+                    processedCount++;
+
+                } catch (err) {
+                    console.error("Error processing file:", file.name, err);
+                    showToast(`無法讀取 ${file.name}`, 'error');
+                }
+            }
+
+            if (processedCount > 0) {
+                updateGallery();
+                const lastImg = newImages[newImages.length - 1];
+                appData.currentId = lastImg.id;
+
+                if (appData.view === 'welcome') {
+                    switchView('single');
+                } else if (appData.view === 'compare') {
+                    renderCompareView();
+                } else {
+                    renderSingleView();
+                }
+
+                setTimeout(() => {
+                    const el = document.getElementById(`thumb-${lastImg.id}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+
+                showToast(`已新增 ${processedCount} 張圖片`);
+            }
+        }
+
+        async function handleUrlInput() {
+            const url = urlInput.value.trim();
+            if (!url) return;
+            try {
+                showToast("下載中...");
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Fetch failed");
+                const blob = await response.blob();
+                const file = new File([blob], "url_image.png", { type: blob.type });
+                await handleFiles([file]);
+                urlInput.value = '';
+            } catch (e) {
+                alert("無法下載圖片 (可能是 CORS 限制)。建議下載圖片後拖曳上傳。");
+            }
+        }
+
+        // --- Parsing Functions ---
+
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function parsePNGData(buffer) {
+            const data = new DataView(buffer);
+            if (data.getUint32(0) !== 0x89504E47) return { raw: "非 PNG 格式", params: {} };
+
+            let offset = 8;
+            let rawText = "";
+
+            while (offset < data.byteLength) {
+                const length = data.getUint32(offset);
+                const type = data.getUint32(offset + 4);
+
+                if (type === 0x74455874) { // tEXt
+                    let idx = offset + 8;
+                    let keyword = "";
+                    while (data.getUint8(idx) !== 0) {
+                        keyword += String.fromCharCode(data.getUint8(idx));
+                        idx++;
+                    }
+                    idx++;
+                    if (keyword === "parameters") {
+                        const textBytes = new Uint8Array(buffer, idx, (offset + 8 + length) - idx);
+                        rawText = new TextDecoder("utf-8").decode(textBytes);
+                        break;
+                    }
+                }
+                offset += 12 + length;
+            }
+
+            if (!rawText) return { prompt: "", negative: "", params: {}, raw: "未找到 Generation info" };
+
+            const lines = rawText.split('\n');
+            let paramsLine = "";
+            let promptLines = [];
+
+            let paramsIndex = -1;
+            for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i];
+                if (line.includes("Steps: ") && line.includes("Seed: ")) {
+                    paramsIndex = i;
+                    paramsLine = line;
+                    break;
+                }
+            }
+
+            if (paramsIndex !== -1) {
+                promptLines = lines.slice(0, paramsIndex);
+            } else {
+                promptLines = lines;
+            }
+
+            const fullPrompt = promptLines.join('\n');
+            const negMarker = "Negative prompt:";
+            let prompt = "";
+            let negative = "";
+
+            const negIdx = fullPrompt.indexOf(negMarker);
+            if (negIdx !== -1) {
+                prompt = fullPrompt.substring(0, negIdx).trim();
+                negative = fullPrompt.substring(negIdx + negMarker.length).trim();
+            } else {
+                prompt = fullPrompt.trim();
+            }
+
+            const params = {};
+            if (paramsLine) {
+                const parts = paramsLine.split(/,\s*(?=[a-zA-Z0-9\s]+:)/);
+                parts.forEach(p => {
+                    const c = p.indexOf(':');
+                    if (c !== -1) {
+                        params[p.substring(0, c).trim()] = p.substring(c + 1).trim();
+                    }
+                });
+            }
+
+            return { prompt, negative, params, raw: rawText };
+        }
+
+        // --- Rendering UI ---
+
+        function updateGallery() {
+            imgCount.innerText = appData.images.length;
+            if (appData.images.length === 0) {
+                galleryList.innerHTML = `<div class="text-center text-slate-600 text-xs py-8">暫無圖片</div>`;
+                return;
+            }
+
+            galleryList.innerHTML = appData.images.map(img => `
+                <div id="thumb-${img.id}" 
+                     onclick="selectImage('${img.id}')"
+                     class="cursor-pointer rounded-lg border-2 border-transparent hover:border-slate-600 overflow-hidden relative group transition-all ${img.id === appData.currentId ? 'thumb-active' : ''} bg-slate-800">
+                    <img src="${img.url}" class="w-full h-20 object-cover" loading="lazy">
+                    <div class="absolute bottom-0 left-0 right-0 bg-black/70 text-[10px] text-white p-1 truncate text-center">
+                        ${img.name}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectImage(id) {
+            appData.currentId = id;
+            updateGallery();
+            if (appData.view === 'welcome') appData.view = 'single';
+
+            if (appData.view === 'single') {
+                renderSingleView();
+            } else {
+                switchView('single');
+            }
+        }
+
+        function switchView(viewName) {
+            appData.view = viewName;
+
+            welcomeScreen.classList.add('hidden');
+            singleView.classList.add('hidden');
+            compareView.classList.add('hidden');
+
+            btnSingle.className = viewName === 'single'
+                ? "px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition-colors"
+                : "px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 transition-colors";
+
+            btnCompare.className = viewName === 'compare'
+                ? "px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition-colors"
+                : "px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 transition-colors";
+
+            if (appData.images.length === 0) {
+                welcomeScreen.classList.remove('hidden');
+                return;
+            }
+
+            if (viewName === 'single') {
+                singleView.classList.remove('hidden');
+                renderSingleView();
+            } else if (viewName === 'compare') {
+                compareView.classList.remove('hidden');
+                renderCompareView();
+            }
+        }
+
+        function renderSingleView() {
+            const img = appData.images.find(x => x.id === appData.currentId);
+            if (!img) return;
+
+            document.getElementById('main-preview').src = img.url;
+            document.getElementById('main-filename').innerText = img.name;
+
+            const info = img.info;
+            document.getElementById('display-prompt').innerText = info.prompt || "無";
+            document.getElementById('display-negative').innerText = info.negative || "無";
+            document.getElementById('display-raw').innerText = info.raw || "無";
+
+            const grid = document.getElementById('display-params');
+            grid.innerHTML = "";
+
+            if (Object.keys(info.params).length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-slate-500 text-sm text-center py-4">無參數資料</div>`;
+            } else {
+                Object.entries(info.params).forEach(([key, val]) => {
+                    const div = document.createElement('div');
+                    div.className = "bg-slate-800 hover:bg-slate-700 p-3 rounded-lg border border-slate-700 cursor-pointer group transition-colors relative";
+                    div.onclick = () => copyTextStr(val);
+                    div.innerHTML = `
+                        <div class="text-[10px] text-slate-500 uppercase font-bold mb-1">${key}</div>
+                        <div class="text-sm font-mono text-slate-200 break-words line-clamp-2" title="${val}">${val}</div>
+                        <i class="fa-regular fa-copy absolute top-2 right-2 text-slate-500 opacity-0 group-hover:opacity-100 text-xs"></i>
+                    `;
+                    grid.appendChild(div);
+                });
+            }
+        }
+
+        // Fix for SyntaxError: Use dynamic element creation or safe data attributes instead of inline raw strings
+        function renderCompareView() {
+            const tbody = document.getElementById('compare-body');
+            const thead = document.getElementById('compare-head');
+            const msg = document.getElementById('compare-empty-msg');
+            const noDiffMsg = document.getElementById('compare-no-diff-msg');
+
+            if (appData.images.length < 2) {
+                tbody.innerHTML = "";
+                thead.innerHTML = "";
+                msg.classList.remove('hidden');
+                noDiffMsg.classList.add('hidden');
+                return;
+            }
+            msg.classList.add('hidden');
+            noDiffMsg.classList.add('hidden');
+
+            const allKeys = new Set();
+            const orderedKeys = ['Model', 'Sampler', 'Steps', 'CFG scale', 'Seed', 'Size', 'Model hash'];
+            orderedKeys.forEach(k => allKeys.add(k));
+
+            appData.images.forEach(img => {
+                Object.keys(img.info.params).forEach(k => allKeys.add(k));
+            });
+
+            // Header
+            let headHTML = `<tr><th class="p-3 sticky-col min-w-[120px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)] border-b border-slate-800">參數項目</th>`;
+            appData.images.forEach(img => {
+                // Modified Image Class for Full Aspect Ratio
+                headHTML += `
+                    <th class="p-3 min-w-[200px] border-l border-b border-slate-700">
+                        <div class="flex flex-col items-center group cursor-zoom-in" onclick="openLightbox('${img.url}')" title="點擊放大">
+                            <div class="relative w-full flex justify-center bg-black/20 rounded mb-2">
+                                <img src="${img.url}" class="h-24 w-auto max-w-[200px] object-contain border border-slate-600 shadow-md group-hover:border-blue-400 transition-colors">
+                                <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded">
+                                    <i class="fa-solid fa-magnifying-glass-plus text-white"></i>
+                                </div>
+                            </div>
+                            <span class="text-xs font-mono truncate max-w-[150px] text-slate-400 group-hover:text-blue-300 transition-colors">${img.name}</span>
+                        </div>
+                    </th>`;
+            });
+            headHTML += `</tr>`;
+            thead.innerHTML = headHTML;
+
+            // Body
+            tbody.innerHTML = ""; // Clear
+            let hasDifferences = false;
+
+            allKeys.forEach(key => {
+                const values = appData.images.map(img => img.info.params[key]);
+                const validValues = values.map(v => v || "");
+                const isDiff = new Set(validValues).size > 1;
+
+                if (!isDiff && appData.images.some(img => img.info.params[key])) {
+                    // Check if at least one image has this key, if identical, skip
+                } else if (!isDiff) {
+                    return; // Skip identical or non-existent
+                }
+
+                // Double check if we really want to skip identical rows (per user request)
+                if (!isDiff) return;
+
+                hasDifferences = true;
+
+                const tr = document.createElement('tr');
+                tr.className = "bg-blue-900/10 hover:bg-blue-900/20 transition-colors";
+
+                // Key Cell
+                const tdKey = document.createElement('td');
+                tdKey.className = "p-3 text-xs text-blue-300 font-bold sticky-col border-b border-slate-800 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.5)] bg-[#172033]";
+                tdKey.innerText = key;
+                tr.appendChild(tdKey);
+
+                // Value Cells
+                appData.images.forEach(img => {
+                    const val = img.info.params[key] || "-";
+                    const tdVal = document.createElement('td');
+                    tdVal.className = "p-3 text-xs text-slate-300 border-l border-b border-slate-800 font-mono break-words cursor-pointer hover:text-white";
+                    tdVal.innerText = val; // Safe text insertion
+                    tdVal.title = "點擊複製";
+                    tdVal.onclick = () => copyTextStr(val); // Safe closure
+                    tr.appendChild(tdVal);
+                });
+
+                tbody.appendChild(tr);
+            });
+
+            if (!hasDifferences) {
+                noDiffMsg.classList.remove('hidden');
+            }
+        }
+
+        // --- Lightbox with Zoom/Pan ---
+
+        function openLightbox(src) {
+            lightboxImage.src = src;
+            lightboxModal.classList.remove('hidden');
+
+            // Reset state
+            lbState = { scale: 1, panning: false, pointX: 0, pointY: 0, startX: 0, startY: 0 };
+            updateLbTransform();
+
+            setTimeout(() => {
+                lightboxModal.classList.remove('opacity-0');
+            }, 10);
+        }
+
+        function closeLightbox() {
+            lightboxModal.classList.add('opacity-0');
+            setTimeout(() => {
+                lightboxModal.classList.add('hidden');
+                lightboxImage.src = ""; // Clean up
+                lbState = { scale: 1, panning: false, pointX: 0, pointY: 0, startX: 0, startY: 0 };
+            }, 300);
+        }
+
+        function handleLbWheel(e) {
+            e.preventDefault();
+
+            const xs = (e.clientX - lbState.pointX) / lbState.scale;
+            const ys = (e.clientY - lbState.pointY) / lbState.scale;
+
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const newScale = Math.min(Math.max(0.1, lbState.scale * delta), 20);
+
+            lbState.pointX = e.clientX - xs * newScale;
+            lbState.pointY = e.clientY - ys * newScale;
+            lbState.scale = newScale;
+
+            updateLbTransform();
+        }
+
+        function handleLbDown(e) {
+            if (e.button !== 0) return; // Only left click
+            e.preventDefault();
+            lbState.panning = true;
+            lbState.startX = e.clientX - lbState.pointX;
+            lbState.startY = e.clientY - lbState.pointY;
+            lightboxImage.style.cursor = 'grabbing';
+            // Add global listeners to ensure we catch moves outside the image
+            window.addEventListener('mousemove', handleLbMove);
+            window.addEventListener('mouseup', handleLbUp);
+        }
+
+        function handleLbMove(e) {
+            if (!lbState.panning) return;
+            e.preventDefault();
+            lbState.pointX = e.clientX - lbState.startX;
+            lbState.pointY = e.clientY - lbState.startY;
+            updateLbTransform();
+        }
+
+        function handleLbUp() {
+            lbState.panning = false;
+            lightboxImage.style.cursor = 'grab';
+            window.removeEventListener('mousemove', handleLbMove);
+            window.removeEventListener('mouseup', handleLbUp);
+        }
+
+        function updateLbTransform() {
+            lightboxImage.style.transform = `translate(${lbState.pointX}px, ${lbState.pointY}px) scale(${lbState.scale})`;
+        }
+
+        // --- Utilities ---
+
+        function toggleRaw() {
+            const c = document.getElementById('raw-container');
+            const a = document.getElementById('raw-arrow');
+            if (c.classList.contains('hidden')) {
+                c.classList.remove('hidden');
+                a.classList.add('rotate-180');
+            } else {
+                c.classList.add('hidden');
+                a.classList.remove('rotate-180');
+            }
+        }
+
+        function copyText(id) {
+            const text = document.getElementById(id).innerText;
+            copyTextStr(text);
+        }
+
+        function copyTextStr(text) {
+            if (!text || text === "-" || text === "無") return;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("已複製");
+            }).catch(() => showToast("複製失敗", 'error'));
+        }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const icon = toast.querySelector('i');
+
+            toastMsg.innerText = msg;
+            icon.className = type === 'error' ? 'fa-solid fa-circle-exclamation text-red-500' : 'fa-solid fa-circle-check text-green-500';
+
+            toast.classList.remove('opacity-0', 'translate-y-20');
+
+            if (window.toastTimer) clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-20');
+            }, 2000);
+        }
+
+    </script>
+</body>
+
+</html>
