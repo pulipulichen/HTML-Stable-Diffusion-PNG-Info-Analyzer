@@ -1,0 +1,10 @@
+services:
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      network: host
+    volumes:
+      - .:/app
+    environment:
+      - CI=true

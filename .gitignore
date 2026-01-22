@@ -1,0 +1,7 @@
+node_modules/
+playwright-report/
+blob-report/
+.env
+playwright-report-videos/
+**/[[]trash
+.vscode
