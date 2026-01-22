@@ -66,6 +66,40 @@ function fitImageToScreen() {
     updateMinimap();
 }
 
+/**
+ * Constrains lbState.pointX and lbState.pointY to keep the image within view
+ * and prevent showing too much of the black background when zoomed in.
+ */
+function constrainLbState() {
+    const canvas = document.getElementById('lb-canvas');
+    if (!canvas || !lbState.imgW || !lbState.imgH) return;
+
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+
+    // Visual dimensions of the image at current scale
+    const visualW = lbState.imgW * lbState.scale;
+    const visualH = lbState.imgH * lbState.scale;
+
+    // If visual width is larger than canvas, constrain panning
+    if (visualW > cw) {
+        const maxPointX = (visualW - cw) / 2;
+        lbState.pointX = Math.max(-maxPointX, Math.min(maxPointX, lbState.pointX));
+    } else {
+        // If smaller, keep it centered
+        lbState.pointX = 0;
+    }
+
+    // If visual height is larger than canvas, constrain panning
+    if (visualH > ch) {
+        const maxPointY = (visualH - ch) / 2;
+        lbState.pointY = Math.max(-maxPointY, Math.min(maxPointY, lbState.pointY));
+    } else {
+        // If smaller, keep it centered
+        lbState.pointY = 0;
+    }
+}
+
 function handleLbWheel(e) {
     e.preventDefault();
     const canvas = document.getElementById('lb-canvas');
@@ -135,6 +169,7 @@ function handleLbUp() {
 }
 
 function updateLbTransform() {
+    constrainLbState();
     const lightboxImage = document.getElementById('lightbox-image');
     if (!lightboxImage) return;
 
