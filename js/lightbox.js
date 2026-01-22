@@ -92,12 +92,22 @@ function handleLbWheel(e) {
     lbState.pointY = mouseY - imgY * newScale;
     lbState.scale = newScale;
 
+    // If we've snapped back to fitScale, reset center
+    if (lbState.scale <= lbState.fitScale * 1.01) {
+        lbState.pointX = 0;
+        lbState.pointY = 0;
+    }
+
     updateLbTransform();
     updateMinimap();
 }
 
 function handleLbDown(e) {
     if (e.button !== 0) return;
+
+    // Only allow panning if zoomed in beyond fitScale
+    if (lbState.scale <= lbState.fitScale * 1.01) return;
+
     e.preventDefault();
     e.stopPropagation(); // Prevent closing
     lbState.panning = true;
@@ -119,22 +129,27 @@ function handleLbMove(e) {
 function handleLbUp() {
     lbState.panning = false;
     const lightboxImage = document.getElementById('lightbox-image');
-    if (lightboxImage) lightboxImage.style.cursor = 'grab';
+    if (lightboxImage) {
+        lightboxImage.style.cursor = lbState.scale > lbState.fitScale * 1.01 ? 'grab' : 'zoom-in';
+    }
 }
 
 function updateLbTransform() {
     const lightboxImage = document.getElementById('lightbox-image');
     if (!lightboxImage) return;
 
-    const w = lbState.imgW * lbState.scale;
-    const h = lbState.imgH * lbState.scale;
+    // Using CSS transform scale for perfect proportionality
+    // We set base width/height to natural image size
+    lightboxImage.style.width = lbState.imgW + 'px';
+    lightboxImage.style.height = lbState.imgH + 'px';
 
-    lightboxImage.style.width = w + 'px';
-    lightboxImage.style.height = h + 'px';
-    // Center + Offset technique
+    // Center + Offset + Scale
     lightboxImage.style.left = `calc(50% + ${lbState.pointX}px)`;
     lightboxImage.style.top = `calc(50% + ${lbState.pointY}px)`;
-    lightboxImage.style.transform = `translate(-50%, -50%)`;
+    lightboxImage.style.transform = `translate(-50%, -50%) scale(${lbState.scale})`;
+
+    // Update cursor
+    lightboxImage.style.cursor = lbState.scale > lbState.fitScale * 1.01 ? 'grab' : 'zoom-in';
 }
 
 // --- Minimap Logic ---

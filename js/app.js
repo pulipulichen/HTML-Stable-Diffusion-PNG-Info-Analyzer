@@ -126,3 +126,25 @@ async function handleUrlInput() {
         alert("無法下載圖片 (可能是 CORS 限制)。建議下載圖片後拖曳上傳。");
     }
 }
+async function loadDemoImages() {
+    const demoFiles = ['00102.png', '00103.png', '00104.png'];
+    const files = [];
+
+    showToast("載入預設圖片中...");
+
+    for (const fileName of demoFiles) {
+        try {
+            const response = await fetch(`demo/${fileName}`);
+            if (!response.ok) throw new Error(`Failed to fetch ${fileName}`);
+            const blob = await response.blob();
+            const file = new File([blob], fileName, { type: 'image/png' });
+            files.push(file);
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    if (files.length > 0) {
+        await handleFiles(files);
+    }
+}

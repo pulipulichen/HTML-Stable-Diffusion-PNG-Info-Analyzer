@@ -78,12 +78,18 @@
                             批次上傳</span></p>
 
                     <div class="relative" onclick="event.stopPropagation()">
-                        <div class="flex">
-                            <input type="text" id="url-input"
-                                class="w-full bg-slate-800 border border-slate-600 rounded-l-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
-                                placeholder="或輸入圖片網址...">
-                            <button onclick="handleUrlInput()"
-                                class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-r-lg text-sm font-medium transition-colors">分析</button>
+                        <div class="flex gap-2">
+                            <div class="flex flex-1">
+                                <input type="text" id="url-input"
+                                    class="w-full bg-slate-800 border border-slate-600 rounded-l-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
+                                    placeholder="或輸入圖片網址...">
+                                <button onclick="handleUrlInput()"
+                                    class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-r-lg text-sm font-medium transition-colors">分析</button>
+                            </div>
+                            <button onclick="loadDemoImages()"
+                                class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-slate-600">
+                                <i class="fa-solid fa-vial mr-1"></i> 預設圖片
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -227,4 +233,5 @@
     <script src="js/lightbox.js"></script>
     <script src="js/app.js"></script>
 </body>
+
 </html>
