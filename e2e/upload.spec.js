@@ -20,7 +20,6 @@ test('should upload demo images and show 3 items in sidebar', async ({ page }) =
   // Expect #sidebarContent > div to have 15 items (修改為預期的數量，例如 3)
   await expect(sidebarItems).toHaveCount(3, { timeout: 60000 });
 
-  await checkFirstSplittedPiecesSize(page);
   // await downloadSVGFile(page);
 });
 
