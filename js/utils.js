@@ -14,10 +14,12 @@ function copyText(id) {
 }
 
 function copyTextStr(text) {
-    if (!text || text === "-" || text === "無") return;
+    const noneText = window.i18n ? i18n.t('common.none') : 'None';
+    const noText = window.i18n ? i18n.t('common.noText') : '-';
+    if (!text || text === noText || text === noneText) return;
     navigator.clipboard.writeText(text)
-        .then(() => showToast("已複製"))
-        .catch(() => showToast("複製失敗", 'error'));
+        .then(() => showToast(i18n.t('toast.copied')))
+        .catch(() => showToast(i18n.t('toast.copyFailed'), 'error'));
 }
 
 function showToast(msg, type = 'success') {

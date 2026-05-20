@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -36,22 +36,28 @@
         class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shrink-0 z-20 shadow-md">
         <div class="flex items-center gap-3">
             <h1 class="text-xl font-bold text-blue-400">
-                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i>PNG Info Analyzer
+                <i class="fa-solid fa-wand-magic-sparkles mr-2"></i><span data-i18n="app.title">PNG Info Analyzer</span>
             </h1>
         </div>
 
-        <div class="flex gap-2">
-            <button onclick="switchView('single')" id="btn-view-single"
-                class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white transition-colors">
-                <i class="fa-solid fa-image mr-2"></i>單圖分析
-            </button>
-            <button onclick="switchView('compare')" id="btn-view-compare"
-                class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 transition-colors">
-                <i class="fa-solid fa-table-columns mr-2"></i>差異比較
+        <div class="flex gap-2 items-center">
+            <label for="language-select" class="text-xs text-slate-400" data-i18n="app.languageLabel">Language</label>
+            <select id="language-select"
+                class="bg-slate-800 border border-slate-700 rounded-md px-2 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                <option value="en">English</option>
+                <option value="zh-TW">繁體中文</option>
+            </select>
+            <button onclick="openShortcutModal()"
+                class="px-3 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition-colors">
+                <i class="fa-solid fa-keyboard mr-2"></i><span data-i18n="shortcut.button">Shortcuts</span>
             </button>
             <button onclick="document.getElementById('file-input').click()"
                 class="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors ml-2">
-                <i class="fa-solid fa-plus mr-2"></i>新增圖片
+                <i class="fa-solid fa-plus mr-2"></i><span data-i18n="app.addImage">Add Images</span>
+            </button>
+            <button onclick="loadDemoImages()" data-action="load-demo-images"
+                class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-white transition-colors border border-slate-600">
+                <i class="fa-solid fa-vial mr-2"></i><span data-i18n="app.demoImages">Demo Images</span>
             </button>
         </div>
     </header>
@@ -63,22 +69,37 @@
         <div id="drop-overlay"
             class="absolute inset-0 bg-slate-900/90 z-50 hidden flex flex-col items-center justify-center border-4 border-dashed border-blue-500 m-4 rounded-xl backdrop-blur-sm pointer-events-none">
             <i class="fa-solid fa-cloud-arrow-up text-6xl text-blue-400 mb-4 animate-bounce"></i>
-            <h2 class="text-2xl font-bold text-white">放開滑鼠以上傳圖片</h2>
+            <h2 class="text-2xl font-bold text-white" data-i18n="drop.title">Drop images to upload</h2>
         </div>
 
         <!-- Sidebar -->
         <aside class="w-24 md:w-32 lg:w-48 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0">
+            <div class="p-2 border-b border-slate-800 space-y-2">
+                <button onclick="switchView('single')" id="btn-view-single" data-view-button-style="sidebar"
+                    class="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white border border-blue-400/60 shadow-sm transition-colors">
+                    <i class="fa-solid fa-image mr-1.5"></i><span data-i18n="app.viewSingle">Single Analysis</span>
+                </button>
+                <button onclick="switchView('compare')" id="btn-view-compare" data-view-button-style="sidebar"
+                    class="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-table-columns mr-1.5"></i><span data-i18n="app.viewCompare">Difference Compare</span>
+                </button>
+                <button onclick="switchView('grid')" id="btn-view-grid" data-view-button-style="sidebar"
+                    class="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-grip mr-1.5"></i><span data-i18n="app.viewGrid">Thumbnail Grid</span>
+                </button>
+            </div>
             <div
                 class="p-3 border-b border-slate-800 flex justify-between items-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                <span>圖片列表 (<span id="img-count">0</span>)</span>
-                <button onclick="clearAllImages()" class="hover:text-red-400 transition-colors" title="全部刪除">
+                <span><span data-i18n="sidebar.imageList">Images</span> (<span id="img-count">0</span>)</span>
+                <button onclick="clearAllImages()" class="hover:text-red-400 transition-colors" data-i18n-title="sidebar.clearAllTitle"
+                    title="Delete all">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
             </div>
             <div id="gallery-list" class="flex-1 overflow-y-auto p-2 space-y-2">
                 <div id="empty-gallery-msg" class="text-center text-slate-600 text-xs py-8 px-2">
                     <i class="fa-regular fa-images text-2xl mb-2"></i>
-                    <p>暫無圖片</p>
+                    <p data-i18n="sidebar.empty">No images</p>
                 </div>
             </div>
             <input type="file" id="file-input" class="hidden" accept="image/png" multiple>
@@ -94,22 +115,23 @@
                     onclick="document.getElementById('file-input').click()">
                     <i
                         class="fa-solid fa-cloud-arrow-up text-5xl text-slate-600 group-hover:text-blue-500 mb-6 transition-colors"></i>
-                    <h2 class="text-2xl font-bold text-white mb-2">開始分析</h2>
-                    <p class="text-slate-400 mb-6">點擊上傳或直接拖曳圖片到此處<br><span class="text-xs text-slate-500">支援多張 PNG
-                            批次上傳</span></p>
+                    <h2 class="text-2xl font-bold text-white mb-2" data-i18n="welcome.startAnalyze">Start Analyzing</h2>
+                    <p class="text-slate-400 mb-6" data-i18n-html="welcome.uploadHint">Click to upload or drag images here</p>
+                    <span class="text-xs text-slate-500 block -mt-4 mb-6" data-i18n="welcome.uploadSubHint">Supports batch PNG upload</span>
 
                     <div class="relative" onclick="event.stopPropagation()">
                         <div class="flex gap-2">
                             <div class="flex flex-1">
                                 <input type="text" id="url-input"
                                     class="w-full bg-slate-800 border border-slate-600 rounded-l-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
-                                    placeholder="或輸入圖片網址...">
+                                    data-i18n-placeholder="welcome.urlPlaceholder" placeholder="Or enter image URL...">
                                 <button onclick="handleUrlInput()"
-                                    class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-r-lg text-sm font-medium transition-colors">分析</button>
+                                    class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-r-lg text-sm font-medium transition-colors"
+                                    data-i18n="welcome.analyze">Analyze</button>
                             </div>
-                            <button onclick="loadDemoImages()" id="loadDemoImagesButton"
+                            <button onclick="loadDemoImages()" data-action="load-demo-images"
                                 class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-slate-600">
-                                <i class="fa-solid fa-vial mr-1"></i> 預設圖片
+                                <i class="fa-solid fa-vial mr-1"></i> <span data-i18n="welcome.demoImages">Demo Images</span>
                             </button>
                         </div>
                     </div>
@@ -123,12 +145,12 @@
                         <!-- Left: Image -->
                         <div class="lg:col-span-4 space-y-4">
                             <div class="bg-slate-900 rounded-xl p-2 border border-slate-800 shadow-lg sticky top-4">
-                                <div class="relative aspect-square bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMGYxNzJhIi8+CjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjgiIGZpbGw9IiMxZTI5M2IiLz4KPHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjQiIGhlaWdodD0iNCIgZmlsbD0iIzFlMjkzYiIvPgo8L3N2Zz4=')] rounded-lg overflow-hidden flex items-center justify-center cursor-zoom-in"
+                                <div class="relative bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMGYxNzJhIi8+CjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjgiIGZpbGw9IiMxZTI5M2IiLz4KPHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjQiIGhlaWdodD0iNCIgZmlsbD0iIzFlMjkzYiIvPgo8L3N2Zz4=')] rounded-lg overflow-hidden flex items-center justify-center cursor-zoom-in min-h-[180px] max-h-[65vh]"
                                     onclick="openLightbox(document.getElementById('main-preview').src)">
-                                    <img id="main-preview" class="max-w-full max-h-full object-contain" src="" alt="">
+                                    <img id="main-preview" class="w-full h-auto max-h-[65vh] object-contain" src="" alt="">
                                 </div>
                                 <div class="mt-3 px-2 pb-1">
-                                    <div class="text-xs font-bold text-slate-500 uppercase">檔案名稱</div>
+                                    <div class="text-xs font-bold text-slate-500 uppercase" data-i18n="single.filename">File Name</div>
                                     <div id="main-filename" class="text-sm font-mono text-slate-300 break-all"></div>
                                 </div>
                             </div>
@@ -138,11 +160,11 @@
                             <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
                                 <div class="flex justify-between items-center p-3 bg-slate-800/50 cursor-pointer hover:bg-slate-800 transition-colors"
                                     onclick="toggleRaw()">
-                                    <span class="text-xs font-bold text-slate-400">原始資料 (Raw Data)</span>
+                                    <span class="text-xs font-bold text-slate-400" data-i18n="single.rawData">Raw Data</span>
                                     <div class="flex items-center gap-2">
                                         <button onclick="event.stopPropagation(); copyText('display-raw')"
                                             class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded transition-colors">
-                                            <i class="fa-regular fa-copy"></i> 複製全部
+                                            <i class="fa-regular fa-copy"></i> <span data-i18n="single.copyAll">Copy all</span>
                                         </button>
                                         <i id="raw-arrow" class="fa-solid fa-chevron-down text-slate-500"></i>
                                     </div>
@@ -159,8 +181,8 @@
                                     </h3>
                                     <button onclick="copyText('display-prompt')"
                                         class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded transition-colors"
-                                        title="複製 Prompt">
-                                        <i class="fa-regular fa-copy"></i> 複製
+                                        data-i18n-title="single.promptCopyTitle" title="Copy Prompt">
+                                        <i class="fa-regular fa-copy"></i> <span data-i18n="single.copy">Copy</span>
                                     </button>
                                 </div>
                                 <p id="display-prompt"
@@ -173,16 +195,16 @@
                                         Prompt</h3>
                                     <button onclick="copyText('display-negative')"
                                         class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded transition-colors"
-                                        title="複製 Negative Prompt">
-                                        <i class="fa-regular fa-copy"></i> 複製
+                                        data-i18n-title="single.negativePromptCopyTitle" title="Copy Negative Prompt">
+                                        <i class="fa-regular fa-copy"></i> <span data-i18n="single.copy">Copy</span>
                                     </button>
                                 </div>
                                 <p id="display-negative"
                                     class="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-light"></p>
                             </div>
                             <div>
-                                <h3 class="text-slate-500 font-bold text-xs uppercase tracking-wider mb-3 px-1">生成參數
-                                    (點擊卡片複製)</h3>
+                                <h3 class="text-slate-500 font-bold text-xs uppercase tracking-wider mb-3 px-1"
+                                    data-i18n="single.generationParams">Generation Parameters (Click card to copy)</h3>
                                 <div id="display-params" class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                                 </div>
                             </div>
@@ -191,22 +213,83 @@
                 </div>
             </div>
 
+            <!-- Grid View -->
+            <div id="grid-view" class="hidden absolute inset-0 overflow-y-auto p-4 md:p-8 fade-in z-10">
+                <div class="max-w-7xl mx-auto space-y-4">
+                    <div class="flex flex-wrap gap-3 items-center justify-between">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-200" data-i18n="grid.title">Thumbnail Grid</h2>
+                            <p class="text-sm text-slate-400" data-i18n="grid.hint">Browse all images in a grid layout.</p>
+                        </div>
+                        <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-lg p-1">
+                            <span class="text-xs text-slate-400 px-2" data-i18n="grid.sizeLabel">Thumbnail size</span>
+                            <button id="btn-grid-size-sm" onclick="setGridThumbSize('sm')"
+                                class="px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                                data-i18n="grid.sizeSmall">Small</button>
+                            <button id="btn-grid-size-md" onclick="setGridThumbSize('md')"
+                                class="px-3 py-1.5 rounded text-xs font-medium bg-blue-600 text-white transition-colors"
+                                data-i18n="grid.sizeMedium">Medium</button>
+                            <button id="btn-grid-size-lg" onclick="setGridThumbSize('lg')"
+                                class="px-3 py-1.5 rounded text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                                data-i18n="grid.sizeLarge">Large</button>
+                        </div>
+                    </div>
+                    <div id="grid-cards" class="grid gap-4"></div>
+                </div>
+            </div>
+
             <!-- Compare View -->
             <div id="compare-view" class="hidden absolute inset-0 overflow-auto fade-in z-10 p-4 md:p-8">
                 <div class="min-w-max">
-                    <h2 class="text-xl font-bold text-slate-300 mb-4 px-2">參數差異比對 (僅顯示差異)</h2>
+                    <h2 class="text-xl font-bold text-slate-300 mb-4 px-2" data-i18n="compare.title">Parameter Difference Compare
+                        (differences only)</h2>
                     <table class="w-full border-separate border-spacing-0 text-left text-sm">
                         <thead id="compare-head" class="text-slate-400 sticky-header"></thead>
                         <tbody id="compare-body" class="divide-y divide-slate-800 bg-slate-900/50"></tbody>
                     </table>
                     <p class="text-center text-slate-500 mt-8 text-sm italic hidden" id="compare-empty-msg">
-                        請至少上傳兩張圖片以進行比較。</p>
+                        <span data-i18n="compare.empty">Please upload at least 2 images to compare.</span>
+                    </p>
                     <p class="text-center text-slate-500 mt-8 text-sm italic hidden" id="compare-no-diff-msg">
-                        兩張圖片的參數完全相同。</p>
+                        <span data-i18n="compare.noDiff">No differences found between uploaded images.</span>
+                    </p>
                 </div>
             </div>
 
         </main>
+    </div>
+
+    <!-- Shortcut Modal -->
+    <div id="shortcut-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" onclick="closeShortcutModal()">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl shadow-2xl" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+                <h3 class="text-lg font-semibold text-slate-100" data-i18n="shortcut.dialogTitle">Keyboard Shortcuts</h3>
+                <button onclick="closeShortcutModal()"
+                    class="w-8 h-8 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                    data-i18n-title="shortcut.close" title="Close">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-5">
+                <ul class="space-y-3 text-sm text-slate-200">
+                    <li class="flex items-center justify-between gap-4">
+                        <div class="inline-flex items-center gap-2 text-xs">
+                            <kbd class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200">PgUp</kbd>
+                            <span class="text-slate-500">/</span>
+                            <kbd class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200">PgDn</kbd>
+                        </div>
+                        <span data-i18n="shortcut.prevNext">Prev / Next image</span>
+                    </li>
+                    <li class="flex items-center justify-between gap-4">
+                        <div class="inline-flex items-center gap-2 text-xs">
+                            <kbd class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200">G</kbd>
+                        </div>
+                        <span data-i18n="shortcut.toggleGrid">Toggle grid view</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
     </div>
 
     <!-- Lightbox Modal -->
@@ -236,8 +319,8 @@
 
         <div
             class="fixed bottom-5 left-1/2 -translate-x-1/2 text-center text-slate-300 text-xs pointer-events-none z-50 bg-black/60 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 shadow-xl">
-            <span class="opacity-70"><i class="fa-solid fa-mouse mr-1"></i> 滾輪縮放 • <i
-                    class="fa-solid fa-up-down-left-right mx-1"></i> 左鍵拖曳 (圖片或地圖) • 點擊背景關閉</span>
+            <span class="opacity-70"><i class="fa-solid fa-mouse mr-1"></i> <span data-i18n="lightbox.hint">Wheel to zoom • Drag with left
+                    mouse (image or minimap) • Click background to close</span></span>
         </div>
     </div>
 
@@ -245,13 +328,25 @@
     <div id="toast"
         class="fixed bottom-8 left-1/2 transform -translate-x-1/2 translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-50 pointer-events-none">
         <i class="fa-solid fa-circle-check text-green-500"></i>
-        <span id="toast-msg" class="font-medium">已複製</span>
+        <span id="toast-msg" class="font-medium" data-i18n="toast.copied">Copied</span>
     </div>
 
+    <script src="js/locales/en.js"></script>
+    <script src="js/locales/zh-TW.js"></script>
+    <script src="js/i18n.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/parser.js"></script>
+    <script src="js/ui/view-controls.js"></script>
+    <script src="js/ui/gallery.js"></script>
+    <script src="js/ui/single-view.js"></script>
+    <script src="js/ui/compare-view.js"></script>
+    <script src="js/ui/grid-view.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/lightbox.js"></script>
+    <script src="js/app/state.js"></script>
+    <script src="js/app/image-management.js"></script>
+    <script src="js/app/data-loader.js"></script>
+    <script src="js/app/bootstrap.js"></script>
     <script src="js/app.js"></script>
 </body>
 

@@ -70,3 +70,64 @@ The project includes specific buttons for testing (e.g., `#loadDemoImagesButton`
 1. **Create Test**: Add a file to `e2e/file-name.spec.js`.
 2. **Run Test**: Execute `npm start` in the terminal.
 3. **Debug**: Check the output or examine the `playwright-report-videos/` directory if configured.
+
+## Add `/.gitignore`
+
+Add the following to `.gitignore`:
+```
+**/[[]trash
+.env
+.vscode
+node_modules/
+playwright-report/
+playwright-report-videos/
+```
+
+## Add `/Dockerfile.test`
+
+```
+FROM mcr.microsoft.com/playwright:v1.40.0-jammy
+
+WORKDIR /app
+
+# Install a simple static web server
+RUN npm install -g http-server
+
+# Create a separate directory for node_modules to avoid being overwritten by volume mount
+WORKDIR /deps
+RUN npm init -y && npm install @playwright/test@1.40.0
+
+WORKDIR /app
+# Copy project files
+ 
+# Run tests
+# We use the playwright test runner from the /deps/node_modules
+CMD ["sh", "-c", "http-server . -p 8080 & sleep 2 && NODE_PATH=/deps/node_modules /deps/node_modules/.bin/playwright test --output=/app/playwright-report-videos"]
+```
+
+## Add `/playwright.config.js`
+
+```js
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: 'e2e',
+  outputDir: 'playwright-report-videos',
+  reporter: [['html', { open: 'never', outputFolder: 'playwright-report' }]],
+  use: {
+    // video: 'retain-on-failure',
+    video: 'on',
+  },
+});
+```
+
+
+## Add `/package.json`
+
+```
+{
+    "scripts": {
+        "start": "sudo docker compose up --build --exit-code-from test-runner"
+    }
+}
+```

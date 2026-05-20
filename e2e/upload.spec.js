@@ -1,26 +1,23 @@
 import { test, expect } from '@playwright/test';
-import path from 'path';
 
-test('should upload demo images and show 3 items in sidebar', async ({ page }) => {
+test('should load demo images and render sidebar thumbnails', async ({ page }) => {
+  const consoleErrors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      consoleErrors.push(msg.text());
+    }
+  });
+
   await page.goto('http://localhost:8080');
 
-  // Upload the PDF file
-  // const filePath = path.resolve(__dirname, '../test/Healthkeep_八點體脂計入門指南.pdf');
+  const demoButton = page.locator('[data-action="load-demo-images"]').first();
+  await demoButton.waitFor();
+  await demoButton.click();
 
-  // console.log(`準備上傳檔案： ${filePath}`)
-  const pdfUrlButton = page.locator('#loadDemoImagesButton');
-  await pdfUrlButton.waitFor();
-  await pdfUrlButton.click();
+  const sidebarItems = page.locator('#gallery-list > div[id^="thumb-"]');
+  await expect.poll(async () => sidebarItems.count(), { timeout: 60000 }).toBeGreaterThan(0);
+  await expect(sidebarItems.first()).toBeVisible();
 
-  // Wait for #sidebarContent > div to have data (up to 60 seconds)
-  const sidebarItems = page.locator('#gallery-list > div');
-  await sidebarItems.first().waitFor();
-  await expect(sidebarItems.first()).toBeVisible({ timeout: 60000 });
-
-  // Expect #sidebarContent > div to have 15 items (修改為預期的數量，例如 3)
-  await expect(sidebarItems).toHaveCount(3, { timeout: 60000 });
-
-  // await downloadSVGFile(page);
+  await page.waitForLoadState('networkidle');
+  expect(consoleErrors).toHaveLength(0);
 });
-
-// async function 

@@ -11,7 +11,7 @@ function readFileAsArrayBuffer(file) {
 
 function parsePNGData(buffer) {
     const data = new DataView(buffer);
-    if (data.getUint32(0) !== 0x89504E47) return { raw: "非 PNG 格式", params: {} };
+    if (data.getUint32(0) !== 0x89504E47) return { raw: i18n.t('parser.notPng'), params: {} };
     let offset = 8, rawText = "";
     while (offset < data.byteLength) {
         const length = data.getUint32(offset);
@@ -28,7 +28,7 @@ function parsePNGData(buffer) {
         }
         offset += 12 + length;
     }
-    if (!rawText) return { prompt: "", negative: "", params: {}, raw: "未找到 Generation info" };
+    if (!rawText) return { prompt: "", negative: "", params: {}, raw: i18n.t('parser.generationInfoNotFound') };
     const lines = rawText.split('\n');
     let paramsLine = "", promptLines = [], paramsIndex = -1;
     for (let i = lines.length - 1; i >= 0; i--) {
